@@ -65,6 +65,27 @@ export async function POST(req: NextRequest) {
 Процедура: ${procedure}
 Симптоми: ${symptoms || '—'}
 Източник: Уебсайт`;
+// app/api/book/route.ts  (точно преди cal.events.insert)
+const fb = await cal.freebusy.query({
+  requestBody: {
+    timeMin: startUtc.toISOString(),
+    timeMax: endUtc.toISOString(),
+    timeZone: 'Europe/Sofia',
+    items: [{ id: process.env.BOOKING_CALENDAR_ID! }],
+  },
+});
+const busy = fb.data.calendars?.[process.env.BOOKING_CALENDAR_ID!]?.busy || [];
+const overlaps = busy.some((b) => {
+  const bStart = new Date(b.start!);
+  const bEnd = new Date(b.end!);
+  return startUtc < bEnd && endUtc > bStart;
+});
+if (overlaps) {
+  return NextResponse.json(
+    { error: 'Току-що се зае този интервал. Моля, изберете друг час.' },
+    { status: 409 }
+  );
+}
 
     const res = await cal.events.insert({
       calendarId: process.env.BOOKING_CALENDAR_ID!,
