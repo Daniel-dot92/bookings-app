@@ -5,18 +5,22 @@ import { dayBounds, generateSlots, fmtHHmmLocal, parseZoned } from '@/app/lib/da
 import { WORKING_HOURS } from '@/app/lib/hours';
 import { addMinutes } from 'date-fns';
 
+type Slot = { time: string; available: boolean };
+type AvailabilityPayload = { slots: Slot[]; error?: string };
+
 export async function GET(req: NextRequest) {
   try {
-    const date = req.nextUrl.searchParams.get('date');           // YYYY-MM-DD
+    const date = req.nextUrl.searchParams.get('date'); // YYYY-MM-DD
     const duration = Number(req.nextUrl.searchParams.get('duration') || '30'); // 30|60
 
     if (!date || (duration !== 30 && duration !== 60)) {
-      return NextResponse.json({ slots: [], error: 'invalid params' }, { status: 400 });
+      return NextResponse.json({ slots: [], error: 'invalid params' } satisfies AvailabilityPayload, { status: 400 });
     }
 
-    const dow = new Date(date).getDay();
+    // TZ-safe изчисляване на ден от седмицата (фиксирано към София)
+    const dow = new Date(parseZoned(date, '12:00')).getDay();
     const hours = WORKING_HOURS[dow];
-    if (!hours) return NextResponse.json({ slots: [] }); // почивен ден
+    if (!hours) return NextResponse.json({ slots: [] } satisfies AvailabilityPayload); // почивен ден
 
     const cal = getCalendar();
     const { timeMin, timeMax } = dayBounds(date);
@@ -49,7 +53,7 @@ export async function GET(req: NextRequest) {
     }
 
     // за дадена продължителност – кои стартове са валидни
-    const slots = candidates.map((startUtc) => {
+    const slots: Slot[] = candidates.map((startUtc) => {
       const endUtc = addMinutes(startUtc, duration);
 
       // 1) целият интервал трябва да попада в работното време
@@ -61,9 +65,9 @@ export async function GET(req: NextRequest) {
       return { time: fmtHHmmLocal(startUtc), available: free };
     });
 
-    return NextResponse.json({ slots });
-  } catch (e: any) {
+    return NextResponse.json({ slots } satisfies AvailabilityPayload);
+  } catch (e: unknown) {
     console.error('availability error:', e);
-    return NextResponse.json({ slots: [], error: 'server error' }, { status: 500 });
+    return NextResponse.json({ slots: [], error: 'server error' } satisfies AvailabilityPayload, { status: 500 });
   }
 }
