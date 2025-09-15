@@ -9,7 +9,7 @@ type Props = {
 };
 
 export default function Calendar({ value, onChange }: Props) {
-  const today = new Date();
+  
   const [cursor, setCursor] = React.useState<Date>(startOfMonth(value));
 
   // навигация месец назад/напред
