@@ -13,6 +13,7 @@ type Payload = {
   phone: string;
   procedure: string;
   symptoms?: string;
+  website?: string; // honeypot (по желание)
 };
 
 async function readBody(req: NextRequest): Promise<Payload> {
@@ -33,12 +34,19 @@ async function readBody(req: NextRequest): Promise<Payload> {
     phone: get('phone'),
     procedure: get('procedure'),
     symptoms: get('symptoms') || undefined,
+    website: get('website') || undefined,
   };
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await readBody(req);
+
+    // Honeypot – ако е попълнено, игнорирай
+    if (body.website) {
+      return new NextResponse(null, { status: 204 });
+    }
+
     const {
       date, time, duration,
       firstName, lastName, email, phone, procedure, symptoms
@@ -65,27 +73,28 @@ export async function POST(req: NextRequest) {
 Процедура: ${procedure}
 Симптоми: ${symptoms || '—'}
 Източник: Уебсайт`;
-// app/api/book/route.ts  (точно преди cal.events.insert)
-const fb = await cal.freebusy.query({
-  requestBody: {
-    timeMin: startUtc.toISOString(),
-    timeMax: endUtc.toISOString(),
-    timeZone: 'Europe/Sofia',
-    items: [{ id: process.env.BOOKING_CALENDAR_ID! }],
-  },
-});
-const busy = fb.data.calendars?.[process.env.BOOKING_CALENDAR_ID!]?.busy || [];
-const overlaps = busy.some((b) => {
-  const bStart = new Date(b.start!);
-  const bEnd = new Date(b.end!);
-  return startUtc < bEnd && endUtc > bStart;
-});
-if (overlaps) {
-  return NextResponse.json(
-    { error: 'Току-що се зае този интервал. Моля, изберете друг час.' },
-    { status: 409 }
-  );
-}
+
+    // Re-check за конфликт точно преди insert
+    const fb = await cal.freebusy.query({
+      requestBody: {
+        timeMin: startUtc.toISOString(),
+        timeMax: endUtc.toISOString(),
+        timeZone: 'Europe/Sofia',
+        items: [{ id: process.env.BOOKING_CALENDAR_ID! }],
+      },
+    });
+    const busy = fb.data.calendars?.[process.env.BOOKING_CALENDAR_ID!]?.busy || [];
+    const overlaps = busy.some((b) => {
+      const bStart = new Date(b.start!);
+      const bEnd = new Date(b.end!);
+      return startUtc < bEnd && endUtc > bStart;
+    });
+    if (overlaps) {
+      return NextResponse.json(
+        { error: 'Току-що се зае този интервал. Моля, изберете друг час.' },
+        { status: 409 }
+      );
+    }
 
     const res = await cal.events.insert({
       calendarId: process.env.BOOKING_CALENDAR_ID!,
@@ -96,6 +105,9 @@ if (overlaps) {
         end:   { dateTime: endUtc.toISOString(),   timeZone: 'Europe/Sofia' },
         attendees: [{ email }],
         reminders: { useDefault: true },
+        visibility: 'private',
+        guestsCanInviteOthers: false,
+        guestsCanModify: false,
       },
       sendUpdates: 'all',
     });
@@ -114,7 +126,8 @@ if (overlaps) {
 
     // Ако е JSON – върни JSON
     return NextResponse.json({ ok: true, eventId: res.data.id });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Грешка при записването.' }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Грешка при записването.';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
