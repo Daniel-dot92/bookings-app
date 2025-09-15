@@ -1,3 +1,4 @@
+// app/book/page.tsx
 "use client";
 import * as React from "react";
 import Calendar from "@/app/components/Calendar";
@@ -67,7 +68,7 @@ export default function BookPage() {
       }
 
       setSlots(list);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("availability error:", err);
       setSlots([]);
     } finally {
@@ -79,7 +80,7 @@ export default function BookPage() {
   React.useEffect(() => { load(); }, [load]);
 
   // submit
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedTime) { setError("Моля, изберете час"); return; }
     setError(null); setSuccess(null); setLoading(true);
@@ -99,8 +100,9 @@ export default function BookPage() {
       setSuccess("Успешно записахте час! Проверете имейла си за потвърждение.");
       setSelectedTime(null);
       await load();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Възникна грешка при запис.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -188,6 +190,16 @@ export default function BookPage() {
 
                 {error && <div className="text-sm text-red-600">{error}</div>}
                 {success && <div className="text-sm text-green-600">{success}</div>}
+
+                {/* Honeypot – скрито поле срещу ботове (по желание) */}
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  style={{ position: "absolute", left: "-5000px", height: 0, width: 0, opacity: 0 }}
+                  aria-hidden="true"
+                />
 
                 <button className="w-full h-10 rounded-lg bg-black text-white hover:opacity-90"
                         type="submit" disabled={loading}>
