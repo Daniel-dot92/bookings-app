@@ -126,8 +126,10 @@ export async function POST(req: NextRequest) {
 
     // Ако е JSON – върни JSON
     return NextResponse.json({ ok: true, eventId: res.data.id });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Грешка при записването.';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    } catch (e: unknown) {
+    const message =
+      e instanceof Error ? e.message : 'Грешка при записването.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
+
 }
