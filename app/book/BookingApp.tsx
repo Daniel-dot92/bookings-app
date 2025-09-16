@@ -92,9 +92,10 @@ export default function BookingApp() {
       setSuccess("Успешно записахте час! Проверете имейла си за потвърждение.");
       setSelectedTime(null);
       await load();
-    } catch (err: any) {
-      setError(err.message);
-    } finally { setLoading(false); }
+      } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Грешка при запис.";
+    setError(msg);
+  } finally {x setLoading(false); }
   }
 
   return (
