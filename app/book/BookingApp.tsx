@@ -1,12 +1,19 @@
+// app/book/BookingApp.tsx
 "use client";
+
 import * as React from "react";
 import Calendar from "@/app/components/Calendar";
 import { fmtDateHeader } from "@/app/lib/ui";
 
 type Slot = { time: string; available: boolean };
 type FormData = {
-  firstName: string; lastName: string; email: string; phone: string;
-  procedure: string; symptoms?: string; duration: 30 | 60;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  procedure: string;
+  symptoms?: string;
+  duration: 30 | 60;
 };
 
 function ymd(d: Date) {
@@ -14,6 +21,9 @@ function ymd(d: Date) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+function fmtDateBG(d: Date) {
+  return d.toLocaleDateString("bg-BG", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export default function BookingApp() {
@@ -24,12 +34,18 @@ export default function BookingApp() {
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+
   const [note, setNote] = React.useState<string | null>(null);
   const [hourAvailable, setHourAvailable] = React.useState<boolean>(true);
 
   const [form, setForm] = React.useState<FormData>({
     firstName: "", lastName: "", email: "", phone: "", procedure: "", duration: 30
   });
+
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollToForm = React.useCallback(() => {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -56,9 +72,7 @@ export default function BookingApp() {
       setSlots(list);
     } catch {
       setSlots([]);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [date, duration]);
 
   React.useEffect(() => { load(); }, [load]);
@@ -80,93 +94,121 @@ export default function BookingApp() {
       await load();
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl p-6">
-        <h1 className="text-2xl font-semibold mb-6">Select a Date &amp; Time</h1>
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white">
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        {/* Заглавие */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Запазване на час</h1>
+          <p className="text-gray-500 mt-1">Изберете дата и час за вашата визита</p>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Календар вляво */}
-          <div className="md:col-span-2">
-            <Calendar value={date} onChange={(d)=>setDate(d)} />
-            <div className="text-xs text-gray-500 mt-3">
-              Time zone — {Intl.DateTimeFormat().resolvedOptions().timeZone}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Лява карта – Календар */}
+          <div className="rounded-2xl border shadow-sm bg-white">
+            <div className="flex items-center gap-2 px-6 pt-5 pb-3">
+              <div className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-sky-600">📅</div>
+              <h2 className="text-lg font-semibold text-gray-900">Изберете дата</h2>
+            </div>
+            <div className="px-4 pb-5">
+              <Calendar value={date} onChange={(d)=>setDate(d)} />
             </div>
           </div>
 
-          {/* Слотове вдясно */}
-          <div className="rounded-2xl border shadow-sm p-4 bg-white">
-            <div className="text-sm text-gray-500">
-              {date.toLocaleDateString("en-US", { weekday: "long" })},
+          {/* Дясна карта – Свободни часове */}
+          <div className="rounded-2xl border shadow-sm bg-white p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-sky-600">⏰</div>
+              <h2 className="text-lg font-semibold text-gray-900">Свободни часове за {fmtDateBG(date)}</h2>
             </div>
-            <div className="text-lg font-semibold mb-3">{fmtDateHeader(date)}</div>
 
-            <div className="flex gap-2 mb-2">
-              <button onClick={()=>setDuration(30)}
-                className={`px-3 py-1 rounded-full border ${duration===30?'bg-black text-white':'bg-white hover:bg-gray-50'}`}>
-                30min
-              </button>
-
-              <button onClick={()=> hourAvailable && setDuration(60)} disabled={!hourAvailable}
-                className={`px-3 py-1 rounded-full border ${
-                  duration===60 ? 'bg-black text-white' : 'bg-white hover:bg-gray-50'
-                } ${!hourAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={!hourAvailable ? 'Няма свободен 60-минутен интервал за тази дата' : ''}>
-                60min
-              </button>
+            {/* Продължителност */}
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={()=>setDuration(30)}
+                className={`px-3 py-1 rounded-full border text-sm ${duration===30 ? "bg-sky-600 text-white border-sky-600" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              >30 мин</button>
+              <button
+                onClick={()=> hourAvailable && setDuration(60)}
+                disabled={!hourAvailable}
+                title={!hourAvailable ? "Няма свободен 60-минутен интервал за тази дата" : ""}
+                className={`px-3 py-1 rounded-full border text-sm ${duration===60 ? "bg-sky-600 text-white border-sky-600" : "bg-white text-gray-700 hover:bg-gray-50"} ${!hourAvailable ? "opacity-50 cursor-not-allowed" : ""}`}
+              >60 мин</button>
             </div>
 
             {note && <div className="text-xs text-gray-500 mb-3">{note}</div>}
 
-            {loading && <div className="text-sm">Loading…</div>}
-            {!loading && (
-              <div className="flex flex-col gap-2">
-                {slots.length===0 && <div className="text-sm text-gray-500">No availability this day.</div>}
-                {slots.map(s=>(
-                  <button key={s.time} disabled={!s.available} onClick={()=>setSelectedTime(s.time)}
-                    className={`h-10 rounded-lg border text-sm text-left px-4
-                      ${!s.available ? 'bg-gray-200 text-gray-500 cursor-not-allowed' :
-                        selectedTime===s.time ? 'bg-black text-white' : 'bg-white hover:bg-gray-50'}`}>
-                    {s.time}
+            {/* Слотове – скролируем списък */}
+            <div className="max-h-[420px] overflow-y-auto pr-1">
+              {loading && <div className="text-sm text-gray-600 p-2">Зареждане…</div>}
+              {!loading && slots.length === 0 && <div className="text-sm text-gray-500 p-2">Няма свободни часове за тази дата.</div>}
+              {!loading && slots.length > 0 && (
+                <div className="grid grid-cols-3 gap-3">
+                  {slots.map(s => {
+                    const selected = selectedTime === s.time;
+                    const available = s.available;
+                    return (
+                      <button
+                        key={s.time}
+                        disabled={!available}
+                        onClick={()=>setSelectedTime(s.time)}
+                        className={[
+                          "h-10 rounded-md border text-sm text-center flex items-center justify-center cursor-pointer transition",
+                          available
+                            ? (selected ? "bg-sky-600 text-white border-sky-600" : "bg-white text-gray-800 hover:bg-gray-50")
+                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        ].join(" ")}
+                      >
+                        {s.time}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {selectedTime && (
+                <div className="mt-4 rounded-lg border bg-sky-50 p-3">
+                  <div className="text-sm text-gray-700">
+                    Избран час: <b>{fmtDateHeader(date)} – {selectedTime} ({duration} мин)</b>
+                  </div>
+                  <div className="mt-2">
+                    <button onClick={scrollToForm} className="inline-flex items-center gap-2 px-4 h-9 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700">
+                      Продължи ↓
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Форма */}
+            <div ref={formRef} className="mt-6">
+              {selectedTime && (
+                <form onSubmit={submit} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <input className="border rounded-md p-2" placeholder="Име" required
+                           value={form.firstName} onChange={e=>setForm({...form, firstName:e.target.value})}/>
+                    <input className="border rounded-md p-2" placeholder="Фамилия" required
+                           value={form.lastName} onChange={e=>setForm({...form, lastName:e.target.value})}/>
+                  </div>
+                  <input className="border rounded-md p-2 w-full" placeholder="Имейл" type="email" required
+                         value={form.email} onChange={e=>setForm({...form, email:e.target.value})}/>
+                  <input className="border rounded-md p-2 w-full" placeholder="Телефон" required
+                         value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})}/>
+                  <input className="border rounded-md p-2 w-full" placeholder="Процедура" required
+                         value={form.procedure} onChange={e=>setForm({...form, procedure:e.target.value})}/>
+                  <textarea className="border rounded-md p-2 w-full h-24" placeholder="Симптоми (по желание)"
+                            value={form.symptoms||""} onChange={e=>setForm({...form, symptoms:e.target.value})}/>
+                  {error && <div className="text-sm text-red-600">{error}</div>}
+                  {success && <div className="text-sm text-green-600">{success}</div>}
+                  <button className="w-full h-10 rounded-md bg-sky-600 text-white hover:bg-sky-700" type="submit" disabled={loading}>
+                    {loading ? "Записване…" : "Запази"}
                   </button>
-                ))}
-              </div>
-            )}
-
-            {selectedTime && (
-              <form onSubmit={submit} className="mt-5 space-y-2">
-                <div className="text-sm text-gray-600">
-                  Selected: <b>{fmtDateHeader(date)}</b> at <b>{selectedTime}</b> ({duration} min)
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <input className="border rounded p-2" placeholder="Име" required
-                         value={form.firstName} onChange={e=>setForm({...form, firstName:e.target.value})}/>
-                  <input className="border rounded p-2" placeholder="Фамилия" required
-                         value={form.lastName} onChange={e=>setForm({...form, lastName:e.target.value})}/>
-                </div>
-                <input className="border rounded p-2 w-full" placeholder="Имейл" type="email" required
-                       value={form.email} onChange={e=>setForm({...form, email:e.target.value})}/>
-                <input className="border rounded p-2 w-full" placeholder="Телефон" required
-                       value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})}/>
-                <input className="border rounded p-2 w-full" placeholder="Процедура" required
-                       value={form.procedure} onChange={e=>setForm({...form, procedure:e.target.value})}/>
-                <textarea className="border rounded p-2 w-full h-24" placeholder="Симптоми (по желание)"
-                          value={form.symptoms||''} onChange={e=>setForm({...form, symptoms:e.target.value})}/>
-
-                {error && <div className="text-sm text-red-600">{error}</div>}
-                {success && <div className="text-sm text-green-600">{success}</div>}
-
-                <button className="w-full h-10 rounded-lg bg-black text-white hover:opacity-90" type="submit" disabled={loading}>
-                  {loading ? "Записване…" : "Запази"}
-                </button>
-              </form>
-            )}
+                </form>
+              )}
+            </div>
           </div>
         </div>
       </div>
