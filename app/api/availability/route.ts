@@ -5,12 +5,12 @@ import { dayBounds, generateSlots, fmtHHmmLocal, parseZoned } from "@/app/lib/da
 import { WORKING_HOURS } from "@/app/lib/hours";
 import { addMinutes } from "date-fns";
 
-export const runtime = "nodejs";
+export const runtime = "nodejs"; // googleapis иска Node runtime
 
 export async function GET(req: NextRequest) {
   const qs = req.nextUrl.searchParams;
-  const date = qs.get("date"); // YYYY-MM-DD
-  const duration = Number(qs.get("duration") || "30"); // 30|60
+  const date = qs.get("date");
+  const duration = Number(qs.get("duration") || "30");
 
   try {
     if (!date || (duration !== 30 && duration !== 60)) {
@@ -22,11 +22,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ slots: [], error: "BOOKING_CALENDAR_ID is missing" }, { status: 500 });
     }
 
-    const hours = WORKING_HOURS[new Date(parseZoned(date, "12:00")).getDay()];
+    const dow = new Date(parseZoned(date, "12:00")).getDay();
+    const hours = WORKING_HOURS[dow];
     if (!hours) return NextResponse.json({ slots: [] }); // почивен ден
 
     const cal = getCalendar();
     const { timeMin, timeMax } = dayBounds(date);
+
+    // Диагностика – дали имаме достъп до календара
+    try {
+      await cal.calendars.get({ calendarId });
+    } catch (e: any) {
+      const g = e?.response?.data || e;
+      const msg = g?.error?.message || e?.message || "calendars.get failed";
+      console.error("calendars.get error:", JSON.stringify(g, null, 2));
+      return NextResponse.json(
+        { slots: [], error: `calendars.get: ${msg}`, debug: { calendarId, useSA: process.env.USE_SERVICE_ACCOUNT } },
+        { status: 500 }
+      );
+    }
 
     const fb = await cal.freebusy.query({
       requestBody: {
@@ -59,13 +73,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ slots });
   } catch (e: any) {
-    // извадка на пълното съобщение от Google
     const g = e?.response?.data || e;
-    const msg =
-      g?.error?.message ||
-      e?.message ||
-      "server error";
+    const msg = g?.error?.message || e?.message || "server error";
     console.error("availability error:", JSON.stringify(g, null, 2));
-    return NextResponse.json({ slots: [], error: msg }, { status: 500 });
+    return NextResponse.json(
+      { slots: [], error: msg, debug: { calendarId: process.env.BOOKING_CALENDAR_ID, useSA: process.env.USE_SERVICE_ACCOUNT } },
+      { status: 500 }
+    );
   }
 }
