@@ -2,9 +2,10 @@
 import { google } from "googleapis";
 
 /**
- * OAuth2 (fallback, ако някога решиш да ползваш refresh_token)
+ * OAuth2 клиент (ползва се само от /api/oauth/*,
+ * не е нужен за Service Account в продъкшън, но го оставяме за съвместимост)
  */
-function getOAuth2Client() {
+export function getOAuth2Client() {
   const client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -17,28 +18,23 @@ function getOAuth2Client() {
 }
 
 /**
- * Service Account auth – декодира base64 JSON и връща auth, готов за Calendar API
+ * Service Account auth – декодира base64 JSON и връща JWT auth
  */
 function getServiceAccountAuth() {
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64;
-  if (!b64) {
-    throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_JSON_BASE64");
-  }
+  if (!b64) throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_JSON_BASE64");
   const jsonStr = Buffer.from(b64, "base64").toString("utf8");
   const creds = JSON.parse(jsonStr);
 
-  // Двата начина са ок; JWT е лек и директен:
-  const auth = new google.auth.JWT({
+  return new google.auth.JWT({
     email: creds.client_email,
     key: creds.private_key,
     scopes: ["https://www.googleapis.com/auth/calendar"],
   });
-
-  return auth;
 }
 
 /**
- * Връща инстанция на Google Calendar API с правилния auth
+ * Връща Calendar API клиент с правилния auth (SA или OAuth2)
  */
 export function getCalendar() {
   const useSA = String(process.env.USE_SERVICE_ACCOUNT).toLowerCase() === "true";
